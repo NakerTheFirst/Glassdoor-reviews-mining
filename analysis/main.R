@@ -12,7 +12,11 @@ pacman::p_load(
   text2vec,
   Matrix,
   reshape2,
-  slam
+  slam,
+  cluster,
+  factoextra,
+  fpc,
+  mclust
 )
 
 source("R/utils.R")
@@ -342,3 +346,44 @@ reviews_2020 <- reviews_2020 |>
 # Save
 saveRDS(lda_model, here("models", "lda_model.rds"))
 saveRDS(doc_topics, here("data", "processed", "doc_topics.rds"))
+
+sample_idx <- sample(nrow(cluster_data), size = 3000)
+cluster_sample <- cluster_data[sample_idx, ]
+
+# Optimal k on sample
+fviz_nbclust(cluster_sample, kmeans, method = "silhouette", k.max = 20) +
+  labs(title = "Optimal k (Silhouette) - Sampled")
+
+fviz_nbclust(cluster_sample, kmeans, method = "wss", k.max = 20) +
+  labs(title = "Elbow Method - Sampled")
+
+# Apply K-Means to FULL data (this is fine — kmeans scales well)
+k_chosen <- 11
+km_model <- kmeans(cluster_data, centers = k_chosen, nstart = 25, iter.max = 100) # nolint
+
+# Silhouette on sample only (full is too expensive)
+sil <- silhouette(km_model$cluster[sample_idx], dist(cluster_sample))
+cat(sprintf("K-Means silhouette (sampled): %.3f\n", mean(sil[, 3])))
+
+# Hierarchical on sample only
+hc_model <- hclust(dist(cluster_sample), method = "ward.D2")
+hc_clusters_sample <- cutree(hc_model, k = k_chosen)
+
+# Compare on sample
+mclust::adjustedRandIndex(km_model$cluster[sample_idx], hc_clusters_sample)
+
+# Continue with full data for the rest...
+reviews_2020 <- reviews_2020 |>
+  mutate(cluster_kmeans = km_model$cluster)
+
+# Cluster vs rating/recommend
+reviews_2020 |>
+  group_by(cluster_kmeans) |>
+  summarise(
+    n = n(),
+    mean_rating = mean(overall_rating),
+    pct_recommend = mean(recommend == "v") * 100
+  )
+
+# Save
+write_csv(reviews_2020, here("data", "processed", "reviews-2020-clustered.csv"))
