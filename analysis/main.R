@@ -233,5 +233,15 @@ headline_tokens <- reviews_2020 |>
   select(id, headline) |>
   unnest_tokens(word, headline)
 
+# Remove stopwords from each token set
+pros_tokens <- pros_tokens |>
+  anti_join(stop_words, by = "word")
+
+cons_tokens <- cons_tokens |>
+  anti_join(stop_words, by = "word")
+
+headline_tokens <- headline_tokens |>
+  anti_join(stop_words, by = "word")
+
 # Save
 write_csv(reviews_2020, here("data", "processed", "reviews-2020-clean.csv"))
