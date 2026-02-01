@@ -442,3 +442,14 @@ plot(head(negative_rules, 20), method = "graph")
 
 # Save
 saveRDS(rules, here("models", "association_rules.rds"))
+
+# But what is this topic 8?
+top_terms <- lda_model$get_top_words(n = 10, lambda = 1)
+print(top_terms)
+
+# Focus on the problem topics
+cat("\n--- KEY TOPICS IN NEGATIVE RULES ---\n")
+cat("Topic 3:", paste(top_terms[, 3], collapse = ", "), "\n")
+cat("Topic 4:", paste(top_terms[, 4], collapse = ", "), "\n")
+cat("Topic 6:", paste(top_terms[, 6], collapse = ", "), "\n")
+cat("Topic 8:", paste(top_terms[, 8], collapse = ", "), "\n")
