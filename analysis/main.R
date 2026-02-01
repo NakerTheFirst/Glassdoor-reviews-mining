@@ -18,7 +18,9 @@ pacman::p_load(
   fpc,
   mclust,
   arules,
-  arulesViz
+  arulesViz,
+  skmeans,
+  Rtsne
 )
 
 source("R/utils.R")
@@ -359,7 +361,7 @@ fviz_nbclust(cluster_sample, kmeans, method = "silhouette", k.max = 20) +
 fviz_nbclust(cluster_sample, kmeans, method = "wss", k.max = 20) +
   labs(title = "Elbow Method - Sampled")
 
-# Apply K-Means to FULL data (this is fine — kmeans scales well)
+# Apply K-Means to FULL data
 k_chosen <- 11
 km_model <- kmeans(cluster_data, centers = k_chosen, nstart = 25, iter.max = 100) # nolint
 
@@ -386,6 +388,27 @@ reviews_2020 |>
     mean_rating = mean(overall_rating),
     pct_recommend = mean(recommend == "v") * 100
   )
+
+# Spherical K-Means (cosine-based)
+skm_model <- skmeans(cluster_data, k = k_chosen, control = list(nruns = 25))
+
+# Compare with Euclidean K-Means
+table(km_model$cluster, skm_model$cluster)
+mclust::adjustedRandIndex(km_model$cluster, skm_model$cluster)
+
+# Use spherical k-means going forward
+reviews_2020 <- reviews_2020 |>
+  mutate(cluster_skmeans = skm_model$cluster)
+
+# Re-check cluster vs rating with cosine-based clusters
+reviews_2020 |>
+  group_by(cluster_skmeans) |>
+  summarise(
+    n = n(),
+    mean_rating = mean(overall_rating),
+    pct_recommend = mean(recommend == "v") * 100
+  ) |>
+  arrange(mean_rating)
 
 # Save
 write_csv(reviews_2020, here("data", "processed", "reviews-2020-clustered.csv"))
