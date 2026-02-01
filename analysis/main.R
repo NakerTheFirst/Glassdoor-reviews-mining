@@ -16,7 +16,9 @@ pacman::p_load(
   cluster,
   factoextra,
   fpc,
-  mclust
+  mclust,
+  arules,
+  arulesViz
 )
 
 source("R/utils.R")
@@ -387,3 +389,56 @@ reviews_2020 |>
 
 # Save
 write_csv(reviews_2020, here("data", "processed", "reviews-2020-clustered.csv"))
+
+# Build transactions: top topics + discretized outcomes per review
+# Get top 2 topics per document (where loading > 0.15)
+top_topics_per_doc <- apply(doc_topics, 1, function(x) {
+  idx <- which(x > 0.15)
+  if (length(idx) == 0) idx <- which.max(x)
+  paste0("topic_", idx)
+})
+
+# Create transaction items
+transactions_df <- reviews_2020 |>
+  mutate(
+    topics = top_topics_per_doc,
+    rating_item = paste0("rating_", rating_level),
+    recommend_item = paste0("recommend_", recommend_binary)
+  ) |>
+  select(id, topics, rating_item, recommend_item)
+
+# Expand topics (some docs have multiple)
+transactions_list <- transactions_df |>
+  rowwise() |>
+  mutate(items = list(c(topics, rating_item, recommend_item))) |>
+  pull(items)
+
+# Convert to transactions
+txn <- as(transactions_list, "transactions")
+summary(txn)
+
+# Run Apriori
+rules <- apriori(txn,
+  parameter = list(supp = 0.01, conf = 0.3, minlen = 2, maxlen = 4),
+  control = list(verbose = FALSE)
+)
+
+cat(sprintf("Rules generated: %d\n", length(rules)))
+
+# Filter for interesting rules (predicting negative outcomes)
+negative_rules <- subset(rules, subset = rhs %in% c("recommend_no", "rating_low")) # nolint
+negative_rules <- sort(negative_rules, by = "lift", decreasing = TRUE)
+
+# Top 15 rules predicting negative outcomes
+inspect(head(negative_rules, 15))
+
+# Also check positive outcome rules
+positive_rules <- subset(rules, subset = rhs %in% c("recommend_yes", "rating_high")) # nolint
+positive_rules <- sort(positive_rules, by = "lift", decreasing = TRUE)
+inspect(head(positive_rules, 15))
+
+# Visualize top rules
+plot(head(negative_rules, 20), method = "graph")
+
+# Save
+saveRDS(rules, here("models", "association_rules.rds"))
