@@ -243,5 +243,15 @@ cons_tokens <- cons_tokens |>
 headline_tokens <- headline_tokens |>
   anti_join(stop_words, by = "word")
 
+# Apply stemming (since it's English)
+pros_tokens <- pros_tokens |>
+  mutate(word_stem = wordStem(word))
+
+cons_tokens <- cons_tokens |>
+  mutate(word_stem = wordStem(word))
+
+headline_tokens <- headline_tokens |>
+  mutate(word_stem = wordStem(word))
+
 # Save
 write_csv(reviews_2020, here("data", "processed", "reviews-2020-clean.csv"))
