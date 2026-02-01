@@ -218,5 +218,20 @@ cat(sprintf(
 reviews_2020 <- reviews_2020 |>
   mutate(id = row_number())
 
+# Tokenise pros text
+pros_tokens <- reviews_2020 |>
+  select(id, pros) |>
+  unnest_tokens(word, pros)
+
+# Tokenise cons text
+cons_tokens <- reviews_2020 |>
+  select(id, cons) |>
+  unnest_tokens(word, cons)
+
+# Tokenise headline text
+headline_tokens <- reviews_2020 |>
+  select(id, headline) |>
+  unnest_tokens(word, headline)
+
 # Save
 write_csv(reviews_2020, here("data", "processed", "reviews-2020-clean.csv"))
