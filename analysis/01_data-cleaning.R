@@ -68,3 +68,79 @@ cat("UNIQUE COUNTS:\n")
 cat(sprintf("  Firms: %d\n", n_distinct(reviews_raw$firm)))
 cat(sprintf("  Job titles: %d\n", n_distinct(reviews_raw$job_title)))
 cat(sprintf("  Locations: %d\n\n", n_distinct(reviews_raw$location)))
+
+# ============================================================================
+# PREPROCESSING
+# ============================================================================
+
+# Subset to 2020 only
+reviews_2020 <- reviews_raw |>
+  filter(
+    date_review >= as.Date("2020-01-01"),
+    date_review < as.Date("2021-01-01")
+  ) |>
+  # Drop diversity_inclusion (74% NA)
+  select(-diversity_inclusion) |>
+  # Drop rows with NA in ratings or text
+  drop_na(all_of(rating_cols), headline, pros, cons, location, job_title) |>
+  # Drop short reviews
+  filter(nchar(pros) >= 20, nchar(cons) >= 20) |>
+  # Shuffle
+  slice_sample(prop = 1) |>
+  # Add primary key
+  mutate(id = row_number(), .before = 1)
+
+cols <- colnames(reviews_2020)
+
+# Verify
+cat(sprintf(
+  "Clean dataset: %s rows (%.1f%% of original)\n",
+  format(nrow(reviews_2020), big.mark = ","),
+  100 * nrow(reviews_2020) / nrow(reviews_raw)
+))
+
+glimpse(reviews_2020)
+
+# Detailed summary with skimr
+reviews_2020 |>
+  select(all_of(cols)) |>
+  skim()
+
+# Check if ratings are on expected 1-5 scale
+rating_value_counts <- reviews_2020 |>
+  select(all_of(rating_cols)) |>
+  pivot_longer(everything(), names_to = "rating_type", values_to = "value") |>
+  count(rating_type, value) |>
+  arrange(rating_type, value)
+print(rating_value_counts, n = 30)
+
+# Visualisations
+reviews_2020 |>
+  select(all_of(rating_cols)) |>
+  pivot_longer(everything(), names_to = "rating_type", values_to = "value") |>
+  count(rating_type, value) |>
+  group_by(rating_type) |>
+  mutate(percentage = n / sum(n)) |>
+  ggplot(aes(x = value, y = percentage)) +
+  geom_col(fill = "steelblue") +
+  facet_wrap(~rating_type) +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(title = "Distribution of Ratings", x = "Rating", y = "Percentage") +
+  theme_minimal()
+
+# Correlation between ratings
+reviews_2020 |>
+  select(all_of(rating_cols)) |>
+  cor(use = "pairwise.complete.obs") |>
+  round(2)
+
+# TODO: Encode the categorical columns: recommend, ceo_approv, outlook
+
+# TODO: Add the nchar column for each text variable
+# TODO: Show histograms of each nchars variables all at once
+
+# TODO: Remove stopwords
+# TODO: Tokenise the data
+
+# Save
+write_csv(reviews_2020, here("data", "processed", "reviews-2020-clean.csv"))
