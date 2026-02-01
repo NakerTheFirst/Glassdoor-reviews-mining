@@ -2,7 +2,19 @@
 
 # Setup
 install.packages("pacman")
-pacman::p_load(here, readr, tidyverse, skimr, tidytext, textstem, text2vec, Matrix)
+pacman::p_load(
+  here,
+  readr,
+  tidyverse,
+  skimr,
+  tidytext,
+  textstem,
+  text2vec,
+  Matrix,
+  reshape2,
+  slam
+)
+
 source("R/utils.R")
 theme_update(plot.title = element_text(hjust = 0.5))
 
@@ -297,3 +309,36 @@ cat(sprintf("Sparsity: %.2f%%\n", 100 * (1 - nnzero(tfidf_matrix) / length(tfidf
 sample_doc <- tfidf_matrix[1, ]
 top_terms <- sort(sample_doc, decreasing = TRUE)[1:10]
 print(top_terms)
+
+# LDA using text2vec
+k <- 10
+lda_model <- text2vec::LDA$new(n_topics = k, doc_topic_prior = 0.1, topic_word_prior = 0.01) # nolint
+doc_topics <- lda_model$fit_transform(dtm, n_iter = 1000, convergence_tol = 0.001,  # nolint
+                                       n_check_convergence = 25, progressbar = TRUE) # nolint
+
+cat(sprintf("Doc-topic matrix: %d × %d\n", nrow(doc_topics), ncol(doc_topics)))
+
+# Top terms per topic
+top_terms <- lda_model$get_top_words(n = 10, lambda = 1)
+print(top_terms)
+
+# Assign dominant topic per document
+dominant_topic <- apply(doc_topics, 1, which.max)
+table(dominant_topic)
+
+length(dominant_topic)
+
+# Create a data frame with topic assignments keyed by id
+topic_assignments <- tibble(
+  id = as.integer(rownames(doc_topics)),
+  dominant_topic = apply(doc_topics, 1, which.max),
+  topic_max_prob = apply(doc_topics, 1, max)
+)
+
+# Join back to reviews
+reviews_2020 <- reviews_2020 |>
+  inner_join(topic_assignments, by = "id")
+
+# Save
+saveRDS(lda_model, here("models", "lda_model.rds"))
+saveRDS(doc_topics, here("data", "processed", "doc_topics.rds"))
