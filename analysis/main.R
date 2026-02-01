@@ -2,7 +2,7 @@
 
 # Setup
 install.packages("pacman")
-pacman::p_load(here, readr, tidyverse, skimr, tidytext, textstem, text2vec)
+pacman::p_load(here, readr, tidyverse, skimr, tidytext, textstem, text2vec, Matrix)
 source("R/utils.R")
 theme_update(plot.title = element_text(hjust = 0.5))
 
@@ -255,3 +255,34 @@ combined_tokens |> head(20)
 # Save tokens and reviews_2020 data
 write_csv(combined_tokens, here("data", "processed", "reviews-2020-tokens.csv"))
 write_csv(reviews_2020, here("data", "processed", "reviews-2020-clean.csv"))
+
+# Combine tokens per document (treating each review as one document)
+doc_tokens <- combined_tokens |>
+  group_by(id) |>
+  summarise(tokens = list(word_lemma)) |>
+  pull(tokens, name = id)
+
+# Create vocabulary
+vocab_iterator <- itoken(doc_tokens, progressbar = FALSE)
+vocabulary <- create_vocabulary(vocab_iterator)
+
+# Inspect vocabulary size
+cat(sprintf("Vocabulary size: %d terms\n", nrow(vocabulary)))
+
+# Create document-term matrix
+vectoriser <- vocab_vectorizer(vocabulary)
+dtm <- create_dtm(vocab_iterator, vectoriser)
+
+cat(sprintf("DTM dimensions: %d documents x %d terms\n", nrow(dtm), ncol(dtm)))
+
+# Apply TF-IDF weighting
+tfidf_model <- TfIdf$new()
+tfidf_matrix <- fit_transform(dtm, tfidf_model)
+
+cat(sprintf("TF-IDF matrix: %d × %d (sparse)\n", nrow(tfidf_matrix), ncol(tfidf_matrix))) # nolint
+cat(sprintf("Sparsity: %.2f%%\n", 100 * (1 - nnzero(tfidf_matrix) / length(tfidf_matrix)))) # nolint
+
+# Check a sample of terms with highest TF-IDF values
+sample_doc <- tfidf_matrix[1, ]
+top_terms <- sort(sample_doc, decreasing = TRUE)[1:10]
+print(top_terms)
