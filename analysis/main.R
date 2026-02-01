@@ -4,6 +4,7 @@
 install.packages("pacman")
 pacman::p_load(here, readr, tidyverse, skimr)
 source("R/utils.R")
+theme_update(plot.title = element_text(hjust = 0.5))
 
 set.seed(42)
 
@@ -125,12 +126,6 @@ reviews_2020 |>
   labs(title = "Distribution of Ratings", x = "Rating", y = "Percentage") +
   theme_minimal()
 
-# Correlation between ratings
-reviews_2020 |>
-  select(all_of(rating_cols)) |>
-  cor(use = "pairwise.complete.obs") |>
-  round(2)
-
 # Encode sentiment columns (recommend, ceo_approv, outlook)
 reviews_2020 <- reviews_2020 |>
   mutate(
@@ -147,10 +142,52 @@ reviews_2020 <- reviews_2020 |>
 
 glimpse(reviews_2020)
 
-# TODO: Add the nchar column for each text variable
-# TODO: Show histograms of each nchars variables all at once
+# Add character count columns for text fields
+reviews_2020 <- reviews_2020 |>
+  mutate(
+    headline_length = nchar(headline),
+    pros_length = nchar(pros),
+    cons_length = nchar(cons)
+  )
+
+# Pros and cons lengths together
+reviews_2020 |>
+  select(pros_length, cons_length) |>
+  pivot_longer(everything(), names_to = "field", values_to = "length") |>
+  filter(length > 0) |>
+  ggplot(aes(x = length)) +
+  geom_histogram(bins = 50, fill = "steelblue") +
+  facet_wrap(~field, scales = "free_y") +
+  scale_x_log10() +
+  labs(
+    title = "Pros & Cons Length Distributions",
+    x = "Character Count (log scale)",
+    y = "Count"
+  ) +
+  theme_minimal()
+
+# Headline length
+reviews_2020 |>
+  ggplot(aes(x = headline_length)) +
+  geom_histogram(bins = 50, fill = "steelblue") +
+  labs(
+    title = "Headline Length Distribution",
+    x = "Character Count",
+    y = "Count"
+  ) +
+  theme_minimal()
+
+# Correlation between ratings
+reviews_2020 |>
+  select(all_of(rating_cols)) |>
+  cor(use = "pairwise.complete.obs") |>
+  round(2)
+
+glimpse(reviews_2020)
 
 # TODO: Remove stopwords
+
+
 # TODO: Tokenise the data
 
 # Save
