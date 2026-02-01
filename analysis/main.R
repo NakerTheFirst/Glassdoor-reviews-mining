@@ -90,6 +90,26 @@ reviews_2020 <- reviews_raw |>
 
 cols <- colnames(reviews_2020)
 
+# Text preprocessing for free-text columns
+reviews_2020 <- reviews_2020 |>
+  mutate(
+    across(c(pros, cons, headline), ~ .x |>
+        str_remove_all("[\r\n\t]") |>
+        str_to_lower() |>
+        str_remove_all("[[:punct:]]") |>
+        str_remove_all("[0-9]") |>
+        str_squish()
+    )
+  )
+
+# Light cleaning for categorical columns
+reviews_2020 <- reviews_2020 |>
+  mutate(
+    across(c(firm, job_title, current, location), ~ .x |>
+        str_squish()
+    )
+  )
+
 # Verify
 cat(sprintf(
   "Clean dataset: %s rows (%.1f%% of original)\n",
