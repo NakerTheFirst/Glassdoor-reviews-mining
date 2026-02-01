@@ -238,6 +238,17 @@ cat(sprintf(
 reviews_2020 <- reviews_2020 |>
   mutate(id = row_number())
 
+# Discretise rating columns for association rules later
+reviews_2020 <- reviews_2020 |>
+  mutate(
+    rating_level = case_when(
+      overall_rating <= 2 ~ "low",
+      overall_rating == 3 ~ "medium",
+      overall_rating >= 4 ~ "high"
+    ),
+    recommend_binary = ifelse(recommend == "v", "yes", "no")
+  )
+
 # Tokenize and combine all text fields
 combined_tokens <- bind_rows(
   reviews_2020 |> select(id, text = pros) |> mutate(source = "pros"),
