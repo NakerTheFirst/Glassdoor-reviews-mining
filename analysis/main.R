@@ -3,6 +3,8 @@
 # Setup
 install.packages("pacman")
 pacman::p_load(here, readr, tidyverse, skimr)
+source("R/utils.R")
+
 set.seed(42)
 
 # Load data
@@ -52,26 +54,21 @@ reviews_raw |>
     cons_short = sum(nchar(cons) < 20, na.rm = TRUE)
   )
 
-cat("\n========== DATA VALIDATION SUMMARY ==========\n\n")
-
-cat("DIMENSIONS:\n")
+cat("\n--- Data Validation Sumamry ---\n\n")
+cat("Dimensions:\n")
 cat(sprintf("  Rows: %s\n", format(nrow(reviews_raw), big.mark = ",")))
 cat(sprintf("  Columns: %d\n\n", ncol(reviews_raw)))
 
-# TODO: add a line on how many data there is
-
-cat("\nDATE RANGE:\n")
+cat("\nData range:\n")
 cat(sprintf("  From: %s\n", min(reviews_raw$date_review, na.rm = TRUE)))
 cat(sprintf("  To: %s\n\n", max(reviews_raw$date_review, na.rm = TRUE)))
 
-cat("UNIQUE COUNTS:\n")
+cat("Unique counts:\n")
 cat(sprintf("  Firms: %d\n", n_distinct(reviews_raw$firm)))
 cat(sprintf("  Job titles: %d\n", n_distinct(reviews_raw$job_title)))
 cat(sprintf("  Locations: %d\n\n", n_distinct(reviews_raw$location)))
 
-# ============================================================================
-# PREPROCESSING
-# ============================================================================
+# ---Data Preprocessing---
 
 # Subset to 2020 only
 reviews_2020 <- reviews_raw |>
@@ -134,7 +131,21 @@ reviews_2020 |>
   cor(use = "pairwise.complete.obs") |>
   round(2)
 
-# TODO: Encode the categorical columns: recommend, ceo_approv, outlook
+# Encode sentiment columns (recommend, ceo_approv, outlook)
+reviews_2020 <- reviews_2020 |>
+  mutate(
+    # Binary: did they express an opinion?
+    recommend_has_opinion = recommend != "o",
+    ceo_approv_has_opinion = ceo_approv != "o",
+    outlook_has_opinion = outlook != "o",
+
+    # Ordinal scores (NA if no opinion)
+    recommend_score = encode_sentiment(recommend),
+    ceo_approv_score = encode_sentiment(ceo_approv),
+    outlook_score = encode_sentiment(outlook)
+  )
+
+glimpse(reviews_2020)
 
 # TODO: Add the nchar column for each text variable
 # TODO: Show histograms of each nchars variables all at once
