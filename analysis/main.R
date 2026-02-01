@@ -238,40 +238,20 @@ cat(sprintf(
 reviews_2020 <- reviews_2020 |>
   mutate(id = row_number())
 
-# Tokenise pros text
-pros_tokens <- reviews_2020 |>
-  select(id, pros) |>
-  unnest_tokens(word, pros)
-
-# Tokenise cons text
-cons_tokens <- reviews_2020 |>
-  select(id, cons) |>
-  unnest_tokens(word, cons)
-
-# Tokenise headline text
-headline_tokens <- reviews_2020 |>
-  select(id, headline) |>
-  unnest_tokens(word, headline)
-
-# Remove stopwords from each token set
-pros_tokens <- pros_tokens |>
-  anti_join(stop_words, by = "word")
-
-cons_tokens <- cons_tokens |>
-  anti_join(stop_words, by = "word")
-
-headline_tokens <- headline_tokens |>
-  anti_join(stop_words, by = "word")
-
-# Apply stemming (since it's English)
-pros_tokens <- pros_tokens |>
+# Tokenize and combine all text fields
+combined_tokens <- bind_rows(
+  reviews_2020 |> select(id, text = pros) |> mutate(source = "pros"),
+  reviews_2020 |> select(id, text = cons) |> mutate(source = "cons"),
+  reviews_2020 |> select(id, text = headline) |> mutate(source = "headline")
+) |>
+  unnest_tokens(word, text) |>
+  anti_join(stop_words, by = "word") |>
   mutate(word_stem = wordStem(word))
 
-cons_tokens <- cons_tokens |>
-  mutate(word_stem = wordStem(word))
+# Verify
+combined_tokens |> count(source)
+combined_tokens |> head(20)
 
-headline_tokens <- headline_tokens |>
-  mutate(word_stem = wordStem(word))
-
-# Save
+# Save tokens and reviews_2020 data
+write_csv(combined_tokens, here("data", "processed", "reviews-2020-tokens.csv"))
 write_csv(reviews_2020, here("data", "processed", "reviews-2020-clean.csv"))
