@@ -2,7 +2,7 @@
 
 # Setup
 install.packages("pacman")
-pacman::p_load(here, readr, tidyverse, skimr, tidytext, SnowballC)
+pacman::p_load(here, readr, tidyverse, skimr, tidytext, textstem, text2vec)
 source("R/utils.R")
 theme_update(plot.title = element_text(hjust = 0.5))
 
@@ -246,7 +246,7 @@ combined_tokens <- bind_rows(
 ) |>
   unnest_tokens(word, text) |>
   anti_join(stop_words, by = "word") |>
-  mutate(word_stem = wordStem(word))
+  mutate(word_lemma  = lemmatize_words(word))
 
 # Verify
 combined_tokens |> count(source)
