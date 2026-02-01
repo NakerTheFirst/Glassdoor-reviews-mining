@@ -2,7 +2,7 @@
 
 # Setup
 install.packages("pacman")
-pacman::p_load(here, readr, tidyverse, skimr)
+pacman::p_load(here, readr, tidyverse, skimr, tidytext, SnowballC)
 source("R/utils.R")
 theme_update(plot.title = element_text(hjust = 0.5))
 
@@ -185,10 +185,38 @@ reviews_2020 |>
 
 glimpse(reviews_2020)
 
-# TODO: Remove stopwords
+# Z-score outlier detection for text lengths
+reviews_2020 <- reviews_2020 |>
+  mutate(
+    headline_zscore = (headline_length - mean(headline_length)) / sd(headline_length), # nolint: line_length_linter.
+    pros_zscore = (pros_length - mean(pros_length)) / sd(pros_length),
+    cons_zscore = (cons_length - mean(cons_length)) / sd(cons_length)
+  )
 
+glimpse(reviews_2020)
+# Count before dropping
+n_before <- nrow(reviews_2020)
 
-# TODO: Tokenise the data
+# Drop outliers (|z| > 3)
+reviews_2020 <- reviews_2020 |>
+  filter(
+    abs(headline_zscore) <= 3,
+    abs(pros_zscore) <= 3,
+    abs(cons_zscore) <= 3
+  ) |>
+  select(-ends_with("_zscore"))
+
+# Report
+cat(sprintf(
+  "Dropped %d outliers (%.2f%%). Remaining: %s rows\n",
+  n_before - nrow(reviews_2020),
+  100 * (n_before - nrow(reviews_2020)) / n_before,
+  format(nrow(reviews_2020), big.mark = ",")
+))
+
+# Reindex id column after dropping rows
+reviews_2020 <- reviews_2020 |>
+  mutate(id = row_number())
 
 # Save
 write_csv(reviews_2020, here("data", "processed", "reviews-2020-clean.csv"))
