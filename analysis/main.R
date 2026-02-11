@@ -148,7 +148,7 @@ reviews_2020 |>
 rating_value_counts <- reviews_2020 |>
   select(all_of(rating_cols)) |>
   pivot_longer(everything(), names_to = "rating_type", values_to = "value") |>
-  count(rating_type, value) |>
+  dplyr::count(rating_type, value) |>
   arrange(rating_type, value)
 print(rating_value_counts, n = 30)
 
@@ -156,7 +156,7 @@ print(rating_value_counts, n = 30)
 reviews_2020 |>
   select(all_of(rating_cols)) |>
   pivot_longer(everything(), names_to = "rating_type", values_to = "value") |>
-  count(rating_type, value) |>
+  dplyr::count(rating_type, value) |>
   group_by(rating_type) |>
   mutate(percentage = n / sum(n)) |>
   ggplot(aes(x = value, y = percentage)) +
@@ -280,7 +280,7 @@ combined_tokens <- bind_rows(
   mutate(word_lemma  = lemmatize_words(word))
 
 # Verify
-combined_tokens |> count(source)
+combined_tokens |> dplyr::count(source)
 combined_tokens |> head(20)
 
 # Save tokens and reviews_2020 data
@@ -351,6 +351,7 @@ reviews_2020 <- reviews_2020 |>
 saveRDS(lda_model, here("models", "lda_model.rds"))
 saveRDS(doc_topics, here("data", "processed", "doc_topics.rds"))
 
+cluster_data <- doc_topics
 sample_idx <- sample(nrow(cluster_data), size = 3000)
 cluster_sample <- cluster_data[sample_idx, ]
 
@@ -409,6 +410,35 @@ reviews_2020 |>
     pct_recommend = mean(recommend == "v") * 100
   ) |>
   arrange(mean_rating)
+
+# Add tiny noise to break ties
+cluster_sample_noisy <- cluster_sample + matrix(rnorm(length(cluster_sample), sd = 1e-6),  # nolint
+                                                 nrow = nrow(cluster_sample)) # nolint
+tsne_result <- Rtsne(cluster_sample_noisy, dims = 2, perplexity = 30,
+                     verbose = TRUE, max_iter = 500)
+# Build plot dataframe
+tsne_df <- tibble(
+  x = tsne_result$Y[, 1],
+  y = tsne_result$Y[, 2],
+  cluster = factor(skm_model$cluster[sample_idx]),
+  rating = factor(reviews_2020$overall_rating[sample_idx]),
+)
+
+# Plot by cluster
+ggplot(tsne_df, aes(x = x, y = y, color = cluster)) +
+  geom_point(alpha = 0.5, size = 1) +
+  labs(title = "t-SNE: Reviews by Cluster (Cosine K-Means)", x = "t-SNE 1", y = "t-SNE 2") + # nolint
+  theme_minimal()
+
+# Plot by rating
+ggplot(tsne_df, aes(x = x, y = y, color = rating)) +
+  geom_point(alpha = 0.5, size = 1) +
+  scale_color_brewer(palette = "RdYlGn") +
+  labs(title = "t-SNE: Reviews by Rating", x = "t-SNE 1", y = "t-SNE 2") +
+  theme_minimal()
+
+ggsave(here("outputs", "figures", "tsne_clusters.png"), width = 8, height = 6)
+ggsave(here("outputs", "figures", "tsne_ratings.png"), width = 8, height = 6)
 
 # Save
 write_csv(reviews_2020, here("data", "processed", "reviews-2020-clustered.csv"))
